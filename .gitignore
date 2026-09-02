@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# 编辑器和本地工作区
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 本地环境和临时文件
+.env
+.env.*
+*.log
+tmp/
+temp/
+
+# Codex 本地状态和账号登录态
+.codex/
+.codex-accounts/
+auth.json
+*.token
+*.secret
+
+# 如果误把真实账号目录复制到项目内，避免提交
+gm/auth.json
+fox/auth.json
+*/backups/auth.*.json

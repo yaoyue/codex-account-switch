@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+ACCOUNT_ROOT="${CODEX_ACCOUNT_ROOT:-$HOME/.codex-accounts}"
+CURRENT_FILE="$ACCOUNT_ROOT/current"
+
+usage() {
+  cat <<'USAGE'
+用法:
+  codex-account status
+  codex-account save-current <gm|fox>
+  codex-account switch <gm|fox> [vscode参数...]
+  codex-account help
+
+示例:
+  codex-account save-current gm
+  codex-account switch fox .
+  codex-account switch gm /path/to/project
+
+说明:
+  只切换 Codex 登录态 auth.json。
+  config.toml、历史记录、日志、skills、plugins、VSCode 用户配置仍继续使用同一份。
+  日常切换不要在 Codex 内执行退出登录，否则当前账号的 refresh token 可能被服务端撤销。
+  切换账号不会自动覆盖已保存登录态，只有 save-current 会显式保存当前登录态。
+USAGE
+}
+
+die() {
+  printf '错误: %s\n' "$*" >&2
+  exit 1
+}
+
+account_dir() {
+  case "${1:-}" in
+    gm|fox) printf '%s/%s\n' "$ACCOUNT_ROOT" "$1" ;;
+    *) die "账号名只能是 gm 或 fox" ;;
+  esac
+}
+
+auth_path_for() {
+  printf '%s/auth.json\n' "$(account_dir "$1")"
+}
+
+backup_file() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+
+  local backup_dir timestamp
+  backup_dir="$(dirname "$file")/backups"
+  timestamp="$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$backup_dir"
+  cp "$file" "$backup_dir/auth.$timestamp.json"
+  chmod 600 "$backup_dir/auth.$timestamp.json" 2>/dev/null || true
+}
+
+ensure_codex_auth_exists() {
+  [ -f "$CODEX_HOME/auth.json" ] || die "未找到 $CODEX_HOME/auth.json，请先在 VSCode/Codex 中登录一次"
+}
+
+save_current_as() {
+  local account="$1"
+  local dir auth
+  dir="$(account_dir "$account")"
+  auth="$(auth_path_for "$account")"
+
+  ensure_codex_auth_exists
+  mkdir -p "$dir"
+  chmod 700 "$dir" 2>/dev/null || true
+  backup_file "$auth"
+  cp "$CODEX_HOME/auth.json" "$auth"
+  chmod 600 "$auth" 2>/dev/null || true
+  printf '%s\n' "$account" > "$CURRENT_FILE"
+  printf '已把当前 Codex 登录态保存为 %s: %s\n' "$account" "$auth"
+}
+
+switch_to() {
+  local account="$1"
+  shift || true
+
+  local target_auth
+  target_auth="$(auth_path_for "$account")"
+  [ -f "$target_auth" ] || die "未保存 $account 登录态。请先切到该账号并执行: codex-account save-current $account"
+
+  mkdir -p "$CODEX_HOME" "$ACCOUNT_ROOT"
+  cp "$target_auth" "$CODEX_HOME/auth.json"
+  chmod 600 "$CODEX_HOME/auth.json" 2>/dev/null || true
+  printf '%s\n' "$account" > "$CURRENT_FILE"
+  printf '已切换 Codex 登录态为 %s。\n' "$account"
+
+  if command -v code >/dev/null 2>&1; then
+    if [ "$#" -gt 0 ]; then
+      code "$@"
+    else
+      code .
+    fi
+  else
+    printf '提示: 未找到 code 命令。请在 VSCode 命令面板执行 "Shell Command: Install code command in PATH"。\n' >&2
+  fi
+}
+
+status() {
+  printf 'CODEX_HOME: %s\n' "$CODEX_HOME"
+  printf '账号目录: %s\n' "$ACCOUNT_ROOT"
+  if [ -f "$CURRENT_FILE" ]; then
+    printf '当前标记: %s\n' "$(tr -d '[:space:]' < "$CURRENT_FILE")"
+  else
+    printf '当前标记: 未设置\n'
+  fi
+
+  for account in gm fox; do
+    local auth
+    auth="$(auth_path_for "$account")"
+    if [ -f "$auth" ]; then
+      printf '%s: 已保存 (%s)\n' "$account" "$auth"
+    else
+      printf '%s: 未保存\n' "$account"
+    fi
+  done
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  status) status ;;
+  save-current) [ "$#" -eq 1 ] || die "save-current 需要一个账号名"; save_current_as "$1" ;;
+  switch) [ "$#" -ge 1 ] || die "switch 需要一个账号名"; account="$1"; shift; switch_to "$account" "$@" ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; die "未知命令: $cmd" ;;
+esac
