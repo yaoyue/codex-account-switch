@@ -43,6 +43,37 @@ ChatGPT 桌面 App 的登录状态不由本工具管理。
 
 如果 CLI 或其他工具设置了独立的 `CODEX_HOME`，或使用自己的账号存储机制，则不会被这里的 `code-gm`、`code-fox` 影响。
 
+## 验证环境和 Windows 差异
+
+当前实现已经在 macOS 下验证通过。
+
+脚本使用 Bash 编写，依赖 `cp`、`mkdir`、`chmod`、`date`、`tr` 等类 Unix 命令，并通过 `code` 命令启动 VSCode。因此当前版本最适合 macOS，也适合大多数 Linux 或类 Unix shell 环境。
+
+### Windows 原生环境
+
+如果在 Windows 的 PowerShell 或 CMD 中直接使用，当前 `codex-account`、`code-gm`、`code-fox` 不能直接按原样运行，因为它们是 Bash 脚本。
+
+Windows 原生环境建议单独实现 PowerShell 版本，例如：
+
+- 使用 `%USERPROFILE%\.codex` 或 `$env:USERPROFILE\.codex` 作为默认 Codex 状态目录。
+- 使用 `Copy-Item` 替代 `cp`。
+- 使用 `New-Item -ItemType Directory` 替代 `mkdir -p`。
+- 使用 PowerShell 脚本或 `.cmd` 包装 `code` 命令。
+
+### Git Bash
+
+如果使用 Git Bash，并且 VSCode 的 `code` 命令在 Git Bash 中可用，当前脚本有机会直接使用。
+
+需要确认 Git Bash 中的 `~/.codex` 是否对应实际 Codex 客户端读取的同一份账号目录。如果路径不同，即使脚本能运行，也可能切换不到 VSCode/Codex 实际读取的账号。
+
+### WSL
+
+WSL 通常有独立的 Linux 用户目录，例如 `/home/<user>/.codex`，和 Windows 用户目录下的 `.codex` 不是同一份。
+
+如果 Windows 版 VSCode/Codex 读取的是 Windows 用户目录，而脚本在 WSL 中修改的是 WSL 的 `~/.codex/auth.json`，则不会影响 Windows 版 VSCode/Codex 的账号状态。
+
+因此，Windows 用户建议优先使用 PowerShell 版本，或明确把 `CODEX_HOME` 指向实际被目标 Codex 客户端读取的目录后再使用。
+
 ## 安装
 
 ```bash
