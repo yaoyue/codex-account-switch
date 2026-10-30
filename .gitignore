@@ -7,6 +7,10 @@
 *.swp
 *.swo
 
+# Python 验证脚本缓存
+__pycache__/
+*.pyc
+
 # 本地环境和临时文件
 .env
 .env.*
@@ -21,7 +25,8 @@ auth.json
 *.token
 *.secret
 
-# 如果误把真实账号目录复制到项目内，避免提交
-gm/auth.json
-fox/auth.json
-*/backups/auth.*.json
+# 任意层级的账号备份
+**/backups/auth.*.json
+
+# 个人账号对应关系和操作记录，仅保留在本机
+/local-docs/

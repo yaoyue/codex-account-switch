@@ -1,152 +1,98 @@
 # Codex 账号快捷切换
 
-这套脚本用于在同一份 `~/.codex` 状态中只切换 `auth.json`。
+使用自定义账号标签保存和切换 Codex 的文件登录态，并启动 VSCode。账号数量没有固定上限，新增第四个、第五个或更多账号无需修改脚本。
 
-- `config.toml`、Codex 对话记录、日志、skills、plugins、缓存等继续共享同一份。
-- VSCode 用户配置、扩展、工作区配置不做隔离，继续共享同一份。
-- 两个账号只分别保存自己的 `auth.json` 到 `~/.codex-accounts/gm/auth.json` 和 `~/.codex-accounts/fox/auth.json`。
-
-## 命名约定
-
-当前脚本以两个账号为例：
-
-- `gm` / `code-gm`：表示 gmail 邮箱对应的 Codex 账号。
-- `fox` / `code-fox`：表示 foxmail 邮箱对应的 Codex 账号。
-
-这里的 `gm`、`fox` 只是账号标签，方便日常快速区分。其他用户可以按同样思路改成自己的账号标签和快捷命令，例如工作账号、个人账号、不同组织账号等。
-
-## 适用范围和账号状态
-
-本工具只处理 Codex 本地状态目录里的登录态文件：
-
-```text
-~/.codex/auth.json
-```
-
-### VSCode 中的 Codex
-
-`code-gm` 和 `code-fox` 会先把目标账号的 `auth.json` 复制到 `~/.codex/auth.json`，再启动 VSCode。
-
-因此，VSCode 中的 Codex 通常会读取刚切换过去的账号。若 VSCode 已经打开，Codex 扩展可能继续使用旧缓存，建议重载窗口或关闭后重新打开。
-
-### ChatGPT App
-
-ChatGPT 桌面 App 的登录状态不由本工具管理。
-
-执行 `code-gm` 或 `code-fox` 不会让 ChatGPT App 自动切换账号，也不会让 ChatGPT App 退出登录。ChatGPT App 仍会保持它自己当前的登录状态。
-
-### Codex CLI 或其他 Codex 使用方式
-
-如果某个 Codex CLI 或其他 Codex 客户端读取的是同一个 `CODEX_HOME`，默认也就是 `~/.codex`，那么它会受到当前 `~/.codex/auth.json` 的影响。
-
-也就是说，先通过本工具切换到某个账号后，再启动读取同一份 `~/.codex/auth.json` 的 Codex CLI，通常会使用刚切换后的账号。
-
-如果 CLI 或其他工具设置了独立的 `CODEX_HOME`，或使用自己的账号存储机制，则不会被这里的 `code-gm`、`code-fox` 影响。
-
-## 验证环境和 Windows 差异
-
-当前实现已经在 macOS 下验证通过。
-
-脚本使用 Bash 编写，依赖 `cp`、`mkdir`、`chmod`、`date`、`tr` 等类 Unix 命令，并通过 `code` 命令启动 VSCode。因此当前版本最适合 macOS，也适合大多数 Linux 或类 Unix shell 环境。
-
-### Windows 原生环境
-
-如果在 Windows 的 PowerShell 或 CMD 中直接使用，当前 `codex-account`、`code-gm`、`code-fox` 不能直接按原样运行，因为它们是 Bash 脚本。
-
-Windows 原生环境建议单独实现 PowerShell 版本，例如：
-
-- 使用 `%USERPROFILE%\.codex` 或 `$env:USERPROFILE\.codex` 作为默认 Codex 状态目录。
-- 使用 `Copy-Item` 替代 `cp`。
-- 使用 `New-Item -ItemType Directory` 替代 `mkdir -p`。
-- 使用 PowerShell 脚本或 `.cmd` 包装 `code` 命令。
-
-### Git Bash
-
-如果使用 Git Bash，并且 VSCode 的 `code` 命令在 Git Bash 中可用，当前脚本有机会直接使用。
-
-需要确认 Git Bash 中的 `~/.codex` 是否对应实际 Codex 客户端读取的同一份账号目录。如果路径不同，即使脚本能运行，也可能切换不到 VSCode/Codex 实际读取的账号。
-
-### WSL
-
-WSL 通常有独立的 Linux 用户目录，例如 `/home/<user>/.codex`，和 Windows 用户目录下的 `.codex` 不是同一份。
-
-如果 Windows 版 VSCode/Codex 读取的是 Windows 用户目录，而脚本在 WSL 中修改的是 WSL 的 `~/.codex/auth.json`，则不会影响 Windows 版 VSCode/Codex 的账号状态。
-
-因此，Windows 用户建议优先使用 PowerShell 版本，或明确把 `CODEX_HOME` 指向实际被目标 Codex 客户端读取的目录后再使用。
+工具共享同一份 Codex 配置、对话记录、日志、skills、plugins、缓存，以及 VSCode 配置和扩展；每个标签分别保存自己的 `auth.json`。
 
 ## 安装
 
+在本项目根目录执行：
+
 ```bash
 mkdir -p ~/.local/bin
-cp codex-account ~/.local/bin/codex-account
-cp code-gm ~/.local/bin/code-gm
-cp code-fox ~/.local/bin/code-fox
-chmod +x ~/.local/bin/codex-account ~/.local/bin/code-gm ~/.local/bin/code-fox
+install -m 755 codex-account ~/.local/bin/codex-account
 ```
 
-确保 `~/.local/bin` 在 `PATH` 中：
+确保 `~/.local/bin` 位于 `PATH` 中。使用 zsh 时，若尚未配置，可在 `~/.zshrc` 添加以下内容并重新打开终端：
 
 ```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-exec zsh -l
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## 首次登记
+## 保存当前已登录的账号
 
-如果当前 VSCode/Codex 是 gmail 账号登录状态：
+确认 Codex 当前已登录目标账号后，为它选择一个本地标签，例如 `personal`：
 
 ```bash
-codex-account save-current gm
+codex-account save-current personal
 ```
 
-然后在 VSCode/Codex 中手动退出 gmail，登录 foxmail，登录成功后执行：
+登录另一个账号后，使用不同标签保存，例如 `work`、`team-2`、`project-4`。每个标签都需要在对应账号实际登录后单独保存。不要在同一个登录态下连续登记多个标签。
+
+标签以英文字母或数字开头，其余字符允许英文字母、数字、下划线和连字符；`current` 及其大小写变体为内部保留名称。大小写是否区分取决于文件系统，建议标签统一使用小写。标签不需要包含真实姓名、邮箱或组织信息。
+
+`save-current` 只复制当前登录态，不负责登录或核验邮箱。同名标签再次保存时，会先备份已有凭据，再更新副本。
+
+## 切换账号
+
+先完全退出 VSCode（macOS 使用 `Cmd+Q`），并结束其他使用同一份 `CODEX_HOME` 的 Codex 进程，再在外部终端执行目标账号对应的一条命令：
 
 ```bash
-codex-account save-current fox
+codex-account switch personal .
 ```
 
-重要：首次登记之外，日常切换不要再在 Codex 里执行“退出登录”。退出登录可能会让当前账号保存下来的 refresh token 被服务端撤销，表现为切回该账号后能显示账号信息，但无法加载 Codex 额度，使用时报 token 失效。
-
-重要：切换账号不会自动覆盖已保存的登录态。只有明确执行 `codex-account save-current gm` 或 `codex-account save-current fox` 时，才会更新对应账号的 `auth.json`。
-
-## 日常使用
-
-切换到 gmail 并打开当前目录：
+切换到其他账号时，把 `personal` 替换为已登记标签。例如切换到第四个账号并打开指定项目：
 
 ```bash
-code-gm .
+codex-account switch project-4 --new-window /path/to/project
 ```
 
-切换到 foxmail 并打开当前目录：
+命令会复制目标凭据到活动目录，然后调用 `code`。日常切换使用此命令，无需在 Codex 中退出登录。切换不会自动保存刚刚使用的账号；如需保存使用期间刷新的凭据，请在切换前执行对应标签的 `save-current`。
 
-```bash
-code-fox .
-```
-
-查看状态：
+## 查看状态
 
 ```bash
 codex-account status
 ```
 
-## 注意
+该命令自动列出账号根目录下所有有效标签且含有 `auth.json` 的账号，无需维护名单。没有保存任何账号时，会显示空状态。
 
-如果 VSCode 已经打开，Codex 扩展可能缓存了旧登录态。最稳的使用方式是先关闭当前 VSCode 窗口，再执行 `code-gm .` 或 `code-fox .`。如果没有关闭窗口，切换后执行 VSCode 的 `Developer: Reload Window` 通常也可以让扩展重新读取登录态。
+“已保存”只表示文件存在，不验证账号身份、令牌有效性或额度。“当前标记”是最后一次保存或切换时写入的标签，手动登录或从其他目录登记后可能与活动账号不同。
 
-不要把真实登录态文件提交到仓库。`~/.codex/auth.json` 和 `~/.codex-accounts/*/auth.json` 都应视为敏感文件。
+## 快捷命令
 
-当前项目文件本身不包含真实 `auth.json`、token、cookie 或 API key。文档中的本机路径用于说明项目目录和系统目录，没有包含个人姓名、用户名等个人标识路径信息，不影响按当前内容自用。
-
-如果准备作为通用开源项目发布，可以按需要把 gmail、foxmail、具体项目名改成更通用的示例；如果主要保留给自己使用，可以继续保留当前表述。
-
-如果某个账号提示 token 失效，需要手动重新登录该账号，并重新执行：
+可以为任意标签创建快捷命令，例如在 `~/.local/bin/code-personal` 保存：
 
 ```bash
-codex-account save-current gm
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec codex-account switch personal "$@"
 ```
 
-或：
+为文件添加执行权限后，即可使用 `code-personal .`。仓库中已有的 `code-*` 包装脚本继续兼容，均可作为创建个人快捷命令的参考；主命令不依赖这些脚本。
 
-```bash
-codex-account save-current fox
-```
+## 文件位置
+
+| 用途 | 默认位置 |
+| --- | --- |
+| 活动登录态 | `~/.codex/auth.json` |
+| 各账号登录态 | `~/.codex-accounts/<账号标签>/auth.json` |
+| 覆盖保存前的备份 | `~/.codex-accounts/<账号标签>/backups/auth.*.json` |
+| 当前标签标记 | `~/.codex-accounts/current` |
+
+`CODEX_HOME` 可覆盖活动目录，`CODEX_ACCOUNT_ROOT` 可覆盖账号根目录；保存和切换时应使用一致的路径配置。
+
+## 适用范围
+
+当前脚本为 Bash 实现，已在 macOS 验证。其他环境需具备 Bash、类 Unix 文件命令和可用的 VSCode `code` 命令。Windows 原生 PowerShell/CMD 无法直接运行，Git Bash/WSL 需确认实际客户端读取的是同一份目录。
+
+本工具依赖文件形式的 `auth.json`；若使用系统钥匙串，需要先配置文件存储。官方文档介绍了 `CODEX_HOME`、`cli_auth_credentials_store` 和认证流程，见 [Codex 认证文档](https://learn.chatgpt.com/docs/auth)。
+
+## 本地资料与凭据
+
+个人账号对应关系和操作记录可以放在 `local-docs/` 中，该目录已加入 `.gitignore`。公开文档使用匿名示例，不保存真实账号信息、邮箱、登录状态或个人机器路径。
+
+登录态文件及备份包含敏感凭据，不应提交到仓库。本项目的忽略规则覆盖任意层级的 `auth.json`、账号备份以及 `local-docs/`。已被 Git 跟踪的文件不会因新增忽略规则而自动停止跟踪。
+
+更多登记方式、第四个及更多账号的操作、故障处理见 [使用说明](使用说明.md)。

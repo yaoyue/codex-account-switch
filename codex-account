@@ -9,16 +9,19 @@ usage() {
   cat <<'USAGE'
 用法:
   codex-account status
-  codex-account save-current <gm|fox>
-  codex-account switch <gm|fox> [vscode参数...]
+  codex-account save-current <账号标签>
+  codex-account switch <账号标签> [vscode参数...]
   codex-account help
 
 示例:
-  codex-account save-current gm
-  codex-account switch fox .
-  codex-account switch gm /path/to/project
+  codex-account save-current personal
+  codex-account switch work .
+  codex-account switch team-2 /path/to/project
 
 说明:
+  账号数量不限，首次保存新标签即可登记；status 自动列出已保存账号。
+  标签以英文字母或数字开头，其余字符可用英文字母、数字、下划线、连字符。
+  current 及其大小写变体是内部保留名称，不能作为账号标签。
   只切换 Codex 登录态 auth.json。
   config.toml、历史记录、日志、skills、plugins、VSCode 用户配置仍继续使用同一份。
   日常切换不要在 Codex 内执行退出登录，否则当前账号的 refresh token 可能被服务端撤销。
@@ -31,15 +34,23 @@ die() {
   exit 1
 }
 
-account_dir() {
+valid_account() {
+  local LC_ALL=C
   case "${1:-}" in
-    gm|fox) printf '%s/%s\n' "$ACCOUNT_ROOT" "$1" ;;
-    *) die "账号名只能是 gm 或 fox" ;;
+    ''|[cC][uU][rR][rR][eE][nN][tT]|[!a-zA-Z0-9]*|*[!a-zA-Z0-9_-]*) return 1 ;;
   esac
+  return 0
+}
+
+account_dir() {
+  valid_account "${1:-}" || die "账号标签须以英文字母或数字开头，只能包含英文字母、数字、下划线、连字符，且不能使用 current 或其大小写变体"
+  printf '%s/%s\n' "$ACCOUNT_ROOT" "$1"
 }
 
 auth_path_for() {
-  printf '%s/auth.json\n' "$(account_dir "$1")"
+  local dir
+  dir="$(account_dir "$1")" || return 1
+  printf '%s/auth.json\n' "$dir"
 }
 
 backup_file() {
@@ -108,15 +119,19 @@ status() {
     printf '当前标记: 未设置\n'
   fi
 
-  for account in gm fox; do
-    local auth
-    auth="$(auth_path_for "$account")"
-    if [ -f "$auth" ]; then
-      printf '%s: 已保存 (%s)\n' "$account" "$auth"
-    else
-      printf '%s: 未保存\n' "$account"
-    fi
+  local auth dir account
+  local found=0
+  for auth in "$ACCOUNT_ROOT"/*/auth.json; do
+    [ -f "$auth" ] || continue
+    dir="${auth%/auth.json}"
+    account="${dir##*/}"
+    valid_account "$account" || continue
+    printf '%s: 已保存 (%s)\n' "$account" "$auth"
+    found=1
   done
+  if [ "$found" -eq 0 ]; then
+    printf '尚未保存任何账号。\n'
+  fi
 }
 
 cmd="${1:-help}"
